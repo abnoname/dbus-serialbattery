@@ -26,6 +26,7 @@ from jkbms import Jkbms
 from sinowealth import Sinowealth
 from renogy import Renogy
 from revov import Revov
+from us2000b import us2000b
 #from mnb import MNB
 
 
@@ -51,7 +52,8 @@ def main():
             Jkbms(port=_port, baud=115200),
             Sinowealth(port=_port, baud=9600),
             Renogy(port=_port, baud=9600),
-            Revov (port=_port, baud=9600)
+            Revov (port=_port, baud=9600),
+            us2000b(port=_port, baud=115200)
             # MNB(port=_port, baud=9600),
         ]
 
