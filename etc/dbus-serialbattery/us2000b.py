@@ -54,7 +54,7 @@ class PylontechStack:
         alarmInfoList = []
 
         meanVoltage = 0
-        meanCurrent = 0
+        totalCurrent = 0
         maxChargeCurrent = 0
         maxDischargeCurrent = 0
         totalCapacity = 0
@@ -70,7 +70,7 @@ class PylontechStack:
             totalCapacity = totalCapacity + decoded['ModuleTotalCapacity']
             power = power + (decoded['Voltage'] * decoded['Current'])
             meanVoltage = meanVoltage + decoded['Voltage']
-            meanCurrent = meanCurrent + decoded['Current']
+            totalCurrent = totalCurrent + decoded['Current']
 
             self.pylon.send(self.encode.getChargeDischargeManagement(battNumber=batt, group=self.group))
             raws = self.pylon.receive()
@@ -93,7 +93,7 @@ class PylontechStack:
         self.pylonData['Calculated']['MaxChargeCurrent_A'] = round(maxChargeCurrent / float(self.battcount), 2)
         self.pylonData['Calculated']['MaxDischargeCurrent_A'] = round(maxDischargeCurrent / float(self.battcount), 2)
         self.pylonData['Calculated']['MeanVoltage_V'] = round(meanVoltage / float(self.battcount), 2)
-        self.pylonData['Calculated']['MeanCurrent_A'] = round(meanCurrent / float(self.battcount), 2)
+        self.pylonData['Calculated']['TotalCurrent_A'] = round(totalCurrent, 2)
         self.pylonData['Calculated']['TotalCapacity_Ah'] = totalCapacity
         self.pylonData['Calculated']['RemainCapacity_Ah'] = remainCapacity
         self.pylonData['Calculated']['Remain_Percent'] = round((remainCapacity / totalCapacity) * 100, 0)
@@ -116,6 +116,8 @@ class us2000b(Battery):
     BATTERYTYPE = "US2000B"
     LENGTH_CHECK = 4
     LENGTH_POS = 3
+    MAX_CELL_VOLTAGE = 3.4
+    MIN_CELL_VOLTAGE = 3.1
 
     def test_connection(self):
         # call a function that will connect to the battery, send a command and retrieve the result.
@@ -136,11 +138,12 @@ class us2000b(Battery):
         # Uncomment if BMS does not supply capacity
         self.capacity = data.pylonData['Calculated']['TotalCapacity_Ah']
         self.cell_count = data.battcount * 15
-        #self.cell_max_voltage = 0
-        #self.cell_min_voltage = 0
+        self.cell_max_voltage = MAX_CELL_VOLTAGE
+        self.cell_min_voltage = MIN_CELL_VOLTAGE
         self.max_battery_voltage = MAX_CELL_VOLTAGE * self.cell_count
         self.min_battery_voltage = MIN_CELL_VOLTAGE * self.cell_count
         return True
+
 
     def refresh_data(self):
         # call all functions that will refresh the battery data.
@@ -161,7 +164,7 @@ class us2000b(Battery):
             return False
 
         self.voltage = data.pylonData['Calculated']['MeanVoltage_V']
-        self.current = data.pylonData['Calculated']['MeanCurrent_A']
+        self.current = data.pylonData['Calculated']['TotalCurrent_A']
         self.soc = data.pylonData['Calculated']['Remain_Percent']
         self.max_battery_current = data.pylonData['Calculated']['MaxChargeCurrent_A']
         self.max_battery_discharge_current = data.pylonData['Calculated']['MaxDischargeCurrent_A']
