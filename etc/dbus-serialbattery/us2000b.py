@@ -6,7 +6,6 @@ from struct import *
 from pylontech import PylontechRS485
 from pylontech import PylontechDecode
 from pylontech import PylontechEncode
-#from pylontech import PylontechStack
 
 class PylontechStack:
     """! Whole battery stack abstraction layer.
@@ -137,10 +136,8 @@ class us2000b(Battery):
 
         # Uncomment if BMS does not supply capacity
         self.capacity = data.pylonData['Calculated']['TotalCapacity_Ah']
-        self.max_battery_current = data.pylonData['Calculated']['MaxChargeCurrent_A']
-        self.max_battery_discharge_current = data.pylonData['Calculated']['MaxDischargeCurrent_A']
-        self.max_battery_voltage = MAX_CELL_VOLTAGE * self.cell_count
-        self.min_battery_voltage = MIN_CELL_VOLTAGE * self.cell_count
+        #self.max_battery_voltage = MAX_CELL_VOLTAGE * self.cell_count
+        #self.min_battery_voltage = MIN_CELL_VOLTAGE * self.cell_count
         return True
 
     def refresh_data(self):
@@ -152,16 +149,7 @@ class us2000b(Battery):
         return result
 
     def read_status_data(self):
-        status_data = self.read_serial_data_template()
-        # check if connection success
-        if status_data is False:
-            return False
-
-        self.cell_count, self.temp_sensors, self.charger_connected, self.load_connected, \
-            state, self.cycles = unpack_from('>bb??bhx', status_data)
-
-        self.hardware_version = "TemplateBMS " + str(self.cell_count) + " cells"
-        logger.info(self.hardware_version)
+        # todo
         return True
 
     def read_soc_data(self):
@@ -173,11 +161,13 @@ class us2000b(Battery):
         self.voltage = data.pylonData['Calculated']['MeanVoltage_V']
         self.current = data.pylonData['Calculated']['MeanCurrent_A']
         self.soc = data.pylonData['Calculated']['Remain_Percent']
+        self.max_battery_current = data.pylonData['Calculated']['MaxChargeCurrent_A']
+        self.max_battery_discharge_current = data.pylonData['Calculated']['MaxDischargeCurrent_A']
         return True
 
     def read_serial_data_template(self):
         try:
-            x = PylontechStack("/dev/ttyUSB15", baud=115200, manualBattcountLimit=2)
+            x = PylontechStack(self.port, baud=115200, manualBattcountLimit=2)
             x.update()
             return x
         except:
