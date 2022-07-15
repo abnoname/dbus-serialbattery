@@ -117,7 +117,6 @@ class us2000b(Battery):
     LENGTH_CHECK = 4
     LENGTH_POS = 3
 
-
     def test_connection(self):
         # call a function that will connect to the battery, send a command and retrieve the result.
         # The result or call should be unique to this BMS. Battery name or version, etc.
@@ -136,8 +135,11 @@ class us2000b(Battery):
 
         # Uncomment if BMS does not supply capacity
         self.capacity = data.pylonData['Calculated']['TotalCapacity_Ah']
-        #self.max_battery_voltage = MAX_CELL_VOLTAGE * self.cell_count
-        #self.min_battery_voltage = MIN_CELL_VOLTAGE * self.cell_count
+        self.cell_count = data.battcount * 15
+        #self.cell_max_voltage = 0
+        #self.cell_min_voltage = 0
+        self.max_battery_voltage = MAX_CELL_VOLTAGE * self.cell_count
+        self.min_battery_voltage = MIN_CELL_VOLTAGE * self.cell_count
         return True
 
     def refresh_data(self):
