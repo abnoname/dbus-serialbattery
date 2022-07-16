@@ -137,12 +137,10 @@ class us2000b(Battery):
         super(us2000b, self).__init__(port, baud)
         self.stack = None
         self.type = self.BATTERYTYPE
+        globals()['MAX_CELL_VOLTAGE'] = 52.5 / 15.0
+        globals()['MIN_CELL_VOLTAGE'] = 47.8 / 15.0
 
     BATTERYTYPE = "US2000B"
-    LENGTH_CHECK = 4
-    LENGTH_POS = 3
-    MAX_CELL_VOLTAGE = 3.4
-    MIN_CELL_VOLTAGE = 3.1
 
     def test_connection(self):
         # call a function that will connect to the battery, send a command and retrieve the result.
@@ -169,7 +167,7 @@ class us2000b(Battery):
 
         try:
             self.capacity = data.pylonData['Calculated']['TotalCapacity_Ah']
-            self.cell_count = data.battcount * 15
+            self.cell_count = 15
             self.cell_max_voltage = MAX_CELL_VOLTAGE
             self.cell_min_voltage = MIN_CELL_VOLTAGE
             self.max_battery_voltage = MAX_CELL_VOLTAGE * self.cell_count
@@ -206,8 +204,9 @@ class us2000b(Battery):
             self.current = data.pylonData['Calculated']['TotalCurrent_A']
             self.soc = data.pylonData['Calculated']['Remain_Percent']
             self.max_battery_current = data.pylonData['Calculated']['MaxChargeCurrent_A']
-            self.max_battery_discharge_current = data.pylonData['Calculated']['MaxDischargeCurrent_A']
+            self.max_battery_discharge_current = -1 * data.pylonData['Calculated']['MaxDischargeCurrent_A']
             self.online = True
+            print(str(data.pylonData['Calculated']))
         except:
             pass
 
@@ -231,3 +230,4 @@ class us2000b(Battery):
             logger.error(">>> ERROR: PylontechStack update: " + str(err))
         
         return False
+
