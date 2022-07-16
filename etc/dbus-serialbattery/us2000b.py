@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, division, print_function, unicode_literals
+from logging import exception
 from battery import Protection, Battery, Cell
 from utils import *
 from struct import *
@@ -226,8 +227,12 @@ class us2000b(Battery):
             if(self.stack.pylon.rs485.ser.isOpen):
                 self.stack.pylon.rs485.ser.close()
             return self.stack
+        except serial.SerialException as err:
+            logger.error(">>> ERROR: PylontechStack SerialException: " + str(err))
+            raise exception("Connection Error")
         except Exception as err:
-            logger.error(">>> ERROR: PylontechStack update: " + str(err))
+            logger.error(">>> ERROR: PylontechStack update Exception: " + str(err))
         
         return False
+
 
