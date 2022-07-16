@@ -99,35 +99,21 @@ class PylontechStack:
         self.pylonData['ChargeDischargeManagementList'] = chargeDischargeManagementList
         self.pylonData['AlarmInfoList'] = alarmInfoList
 
-        self.pylonData['Calculated']['MaxChargeCurrent_A'] = 0
-        self.pylonData['Calculated']['MaxDischargeCurrent_A'] = 0
-        self.pylonData['Calculated']['MeanVoltage_V'] = 0
-        self.pylonData['Calculated']['TotalCurrent_A'] = 0
-        self.pylonData['Calculated']['TotalCapacity_Ah'] = 0
-        self.pylonData['Calculated']['RemainCapacity_Ah'] = 0
-        self.pylonData['Calculated']['Remain_Percent'] = 0
-        self.pylonData['Calculated']['Power_kW'] = 0
-        self.pylonData['Calculated']['ChargePower_kW'] = 0
-        self.pylonData['Calculated']['DischargePower_kW'] = 0
+        self.pylonData['Calculated']['MaxChargeCurrent_A'] = round(maxChargeCurrent, 2)
+        self.pylonData['Calculated']['MaxDischargeCurrent_A'] = round(maxDischargeCurrent, 2)
+        self.pylonData['Calculated']['MeanVoltage_V'] = round(meanVoltage / float(self.battcount), 2)
+        self.pylonData['Calculated']['TotalCurrent_A'] = round(totalCurrent, 2)
+        self.pylonData['Calculated']['TotalCapacity_Ah'] = totalCapacity
+        self.pylonData['Calculated']['RemainCapacity_Ah'] = remainCapacity
+        self.pylonData['Calculated']['Remain_Percent'] = round((remainCapacity / totalCapacity) * 100, 0)
 
-        try:
-            self.pylonData['Calculated']['MaxChargeCurrent_A'] = round(maxChargeCurrent, 2)
-            self.pylonData['Calculated']['MaxDischargeCurrent_A'] = round(maxDischargeCurrent, 2)
-            self.pylonData['Calculated']['MeanVoltage_V'] = round(meanVoltage / float(self.battcount), 2)
-            self.pylonData['Calculated']['TotalCurrent_A'] = round(totalCurrent, 2)
-            self.pylonData['Calculated']['TotalCapacity_Ah'] = totalCapacity
-            self.pylonData['Calculated']['RemainCapacity_Ah'] = remainCapacity
-            self.pylonData['Calculated']['Remain_Percent'] = round((remainCapacity / totalCapacity) * 100, 0)
-
-            self.pylonData['Calculated']['Power_kW'] = round(power / 1000, 5)
-            if self.pylonData['Calculated']['Power_kW'] > 0:
-                self.pylonData['Calculated']['ChargePower_kW'] = self.pylonData['Calculated']['Power_kW']
-                self.pylonData['Calculated']['DischargePower_kW'] = 0
-            else:
-                self.pylonData['Calculated']['ChargePower_kW'] = 0
-                self.pylonData['Calculated']['DischargePower_kW'] = -1.0 * self.pylonData['Calculated']['Power_kW']
-        except Exception as err:
-            logger.error("pylonstack data error: " + str(err))
+        self.pylonData['Calculated']['Power_kW'] = round(power / 1000, 5)
+        if self.pylonData['Calculated']['Power_kW'] > 0:
+            self.pylonData['Calculated']['ChargePower_kW'] = self.pylonData['Calculated']['Power_kW']
+            self.pylonData['Calculated']['DischargePower_kW'] = 0
+        else:
+            self.pylonData['Calculated']['ChargePower_kW'] = 0
+            self.pylonData['Calculated']['DischargePower_kW'] = -1.0 * self.pylonData['Calculated']['Power_kW']
 
         return self.pylonData
 
@@ -153,29 +139,19 @@ class us2000b(Battery):
         # After successful  connection get_settings will be call to set up the battery.
         # Set the current limits, populate cell count, etc
         # Return True if success, False for failure
-        self.capacity = 0
-        self.cell_count = 0
-        self.cell_max_voltage = 0
-        self.cell_min_voltage = 0
-        self.max_battery_voltage = 0
-        self.min_battery_voltage = 0
-        self.online = False
 
         data = self.read_pylon_stack()
         # check if connection success
         if data is False:
             return False
 
-        try:
-            self.capacity = data.pylonData['Calculated']['TotalCapacity_Ah']
-            self.cell_count = 15
-            self.cell_max_voltage = MAX_CELL_VOLTAGE
-            self.cell_min_voltage = MIN_CELL_VOLTAGE
-            self.max_battery_voltage = MAX_CELL_VOLTAGE * self.cell_count
-            self.min_battery_voltage = MIN_CELL_VOLTAGE * self.cell_count
-            self.online = True
-        except:
-            pass
+        self.capacity = data.pylonData['Calculated']['TotalCapacity_Ah']
+        self.cell_count = 15
+        self.cell_max_voltage = MAX_CELL_VOLTAGE
+        self.cell_min_voltage = MIN_CELL_VOLTAGE
+        self.max_battery_voltage = MAX_CELL_VOLTAGE * self.cell_count
+        self.min_battery_voltage = MIN_CELL_VOLTAGE * self.cell_count
+        self.online = True
 
         return True
 
@@ -188,28 +164,17 @@ class us2000b(Battery):
         return result
 
     def read_bat_data(self):
-        self.voltage = 0
-        self.current = 0
-        self.soc = 0
-        self.max_battery_current = 0
-        self.max_battery_discharge_current = 0
-        self.online = False
-
         data = self.read_pylon_stack()
         # check if connection success
         if data is False:
             return False
 
-        try:
-            self.voltage = data.pylonData['Calculated']['MeanVoltage_V']
-            self.current = data.pylonData['Calculated']['TotalCurrent_A']
-            self.soc = data.pylonData['Calculated']['Remain_Percent']
-            self.max_battery_current = data.pylonData['Calculated']['MaxChargeCurrent_A']
-            self.max_battery_discharge_current = -1 * data.pylonData['Calculated']['MaxDischargeCurrent_A']
-            self.online = True
-            print(str(data.pylonData['Calculated']))
-        except:
-            pass
+        self.voltage = data.pylonData['Calculated']['MeanVoltage_V']
+        self.current = data.pylonData['Calculated']['TotalCurrent_A']
+        self.soc = data.pylonData['Calculated']['Remain_Percent']
+        self.max_battery_current = data.pylonData['Calculated']['MaxChargeCurrent_A']
+        self.max_battery_discharge_current = -1 * data.pylonData['Calculated']['MaxDischargeCurrent_A']
+        self.online = True
 
         return True
 
@@ -232,7 +197,6 @@ class us2000b(Battery):
             raise exception("Connection Error")
         except Exception as err:
             logger.error(">>> ERROR: PylontechStack update Exception: " + str(err))
+            raise exception("Update Error")
         
         return False
-
-
