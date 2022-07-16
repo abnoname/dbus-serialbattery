@@ -3,9 +3,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from battery import Protection, Battery, Cell
 from utils import *
 from struct import *
-from pylontech import PylontechRS485
+from pylontech import PylontechRS485, Rs485Handler
 from pylontech import PylontechDecode
 from pylontech import PylontechEncode
+
 
 class PylontechStack:
     """! Whole battery stack abstraction layer.
@@ -14,7 +15,7 @@ class PylontechStack:
     All Data polled is attached as raw result lists as well.
     """
 
-    def __init__(self, device, baud=9600, manualBattcountLimit=15, group=0):
+    def __init__(self, device, baud=9600, manualBattcountLimit=15, timeout=5, group=0):
         """! The class initializer.
         @param device  RS485 device name (ex Windows: 'com0', Linux: '/dev/ttyUSB0').
         @param baud  RS485 baud rate. Usually 9500 or 115200 for pylontech.
@@ -28,12 +29,15 @@ class PylontechStack:
         self.encode = PylontechEncode()
         self.decode = PylontechDecode()
 
+        self.timeout = timeout
+
         self.pylonData = {}
         self.group = group
 
         serialList = []
         for batt in range(0, manualBattcountLimit, 1):
-            self.pylon.send(self.encode.getSerialNumber(battNumber=batt, group=self.group))
+            self.pylon.send(self.encode.getSerialNumber(
+                battNumber=batt, group=self.group))
             raws = self.pylon.receive()
             if raws is None:
                 break
@@ -61,7 +65,8 @@ class PylontechStack:
         remainCapacity = 0
         power = 0
         for batt in range(0, self.battcount):
-            self.pylon.send(self.encode.getAnalogValue(battNumber=batt, group=self.group))
+            self.pylon.send(self.encode.getAnalogValue(
+                battNumber=batt, group=self.group))
             raws = self.pylon.receive()
             self.decode.decode_header(raws[0])
             decoded = self.decode.decodeAnalogValue()
@@ -72,45 +77,65 @@ class PylontechStack:
             meanVoltage = meanVoltage + decoded['Voltage']
             totalCurrent = totalCurrent + decoded['Current']
 
-            self.pylon.send(self.encode.getChargeDischargeManagement(battNumber=batt, group=self.group))
+            self.pylon.send(self.encode.getChargeDischargeManagement(
+                battNumber=batt, group=self.group))
             raws = self.pylon.receive()
             self.decode.decode_header(raws[0])
             decoded = self.decode.decodeChargeDischargeManagementInfo()
             chargeDischargeManagementList.append(decoded)
             maxChargeCurrent = maxChargeCurrent + decoded['ChargeCurrent']
-            maxDischargeCurrent = maxDischargeCurrent + decoded['DischargeCurrent']
-
-            self.pylon.send(self.encode.getAlarmInfo(battNumber=batt, group=self.group))
+            maxDischargeCurrent = maxDischargeCurrent + \
+                decoded['DischargeCurrent']
+            
+            self.pylon.send(self.encode.getAlarmInfo(
+                battNumber=batt, group=self.group))
             raws = self.pylon.receive()
             self.decode.decode_header(raws[0])
             decoded = self.decode.decodeAlarmInfo()
             alarmInfoList.append(decoded)
 
         self.pylonData['AnaloglList'] = analoglList
-        self.pylonData['ChargeDischargeManagementList']=chargeDischargeManagementList
+        self.pylonData['ChargeDischargeManagementList'] = chargeDischargeManagementList
         self.pylonData['AlarmInfoList'] = alarmInfoList
 
-        self.pylonData['Calculated']['MaxChargeCurrent_A'] = round(maxChargeCurrent / float(self.battcount), 2)
-        self.pylonData['Calculated']['MaxDischargeCurrent_A'] = round(maxDischargeCurrent / float(self.battcount), 2)
-        self.pylonData['Calculated']['MeanVoltage_V'] = round(meanVoltage / float(self.battcount), 2)
-        self.pylonData['Calculated']['TotalCurrent_A'] = round(totalCurrent, 2)
-        self.pylonData['Calculated']['TotalCapacity_Ah'] = totalCapacity
-        self.pylonData['Calculated']['RemainCapacity_Ah'] = remainCapacity
-        self.pylonData['Calculated']['Remain_Percent'] = round((remainCapacity / totalCapacity) * 100, 0)
+        self.pylonData['Calculated']['MaxChargeCurrent_A'] = 0
+        self.pylonData['Calculated']['MaxDischargeCurrent_A'] = 0
+        self.pylonData['Calculated']['MeanVoltage_V'] = 0
+        self.pylonData['Calculated']['TotalCurrent_A'] = 0
+        self.pylonData['Calculated']['TotalCapacity_Ah'] = 0
+        self.pylonData['Calculated']['RemainCapacity_Ah'] = 0
+        self.pylonData['Calculated']['Remain_Percent'] = 0
+        self.pylonData['Calculated']['Power_kW'] = 0
+        self.pylonData['Calculated']['ChargePower_kW'] = 0
+        self.pylonData['Calculated']['DischargePower_kW'] = 0
 
-        self.pylonData['Calculated']['Power_kW'] = round(power / 1000, 5)
-        if self.pylonData['Calculated']['Power_kW'] > 0:
-            self.pylonData['Calculated']['ChargePower_kW'] = self.pylonData['Calculated']['Power_kW']
-            self.pylonData['Calculated']['DischargePower_kW'] = 0
-        else:
-            self.pylonData['Calculated']['ChargePower_kW'] = 0
-            self.pylonData['Calculated']['DischargePower_kW'] = -1.0 * self.pylonData['Calculated']['Power_kW']
+        try:
+            self.pylonData['Calculated']['MaxChargeCurrent_A'] = round(maxChargeCurrent, 2)
+            self.pylonData['Calculated']['MaxDischargeCurrent_A'] = round(maxDischargeCurrent, 2)
+            self.pylonData['Calculated']['MeanVoltage_V'] = round(meanVoltage / float(self.battcount), 2)
+            self.pylonData['Calculated']['TotalCurrent_A'] = round(totalCurrent, 2)
+            self.pylonData['Calculated']['TotalCapacity_Ah'] = totalCapacity
+            self.pylonData['Calculated']['RemainCapacity_Ah'] = remainCapacity
+            self.pylonData['Calculated']['Remain_Percent'] = round((remainCapacity / totalCapacity) * 100, 0)
+
+            self.pylonData['Calculated']['Power_kW'] = round(power / 1000, 5)
+            if self.pylonData['Calculated']['Power_kW'] > 0:
+                self.pylonData['Calculated']['ChargePower_kW'] = self.pylonData['Calculated']['Power_kW']
+                self.pylonData['Calculated']['DischargePower_kW'] = 0
+            else:
+                self.pylonData['Calculated']['ChargePower_kW'] = 0
+                self.pylonData['Calculated']['DischargePower_kW'] = -1.0 * self.pylonData['Calculated']['Power_kW']
+        except Exception as err:
+            logger.error("pylonstack data error: " + str(err))
+
         return self.pylonData
+
 
 class us2000b(Battery):
 
-    def __init__(self, port,baud):
-        super(us2000b, self).__init__(port,baud)
+    def __init__(self, port, baud):
+        super(us2000b, self).__init__(port, baud)
+        self.stack = None
         self.type = self.BATTERYTYPE
 
     BATTERYTYPE = "US2000B"
@@ -129,53 +154,80 @@ class us2000b(Battery):
         # After successful  connection get_settings will be call to set up the battery.
         # Set the current limits, populate cell count, etc
         # Return True if success, False for failure
+        self.capacity = 0
+        self.cell_count = 0
+        self.cell_max_voltage = 0
+        self.cell_min_voltage = 0
+        self.max_battery_voltage = 0
+        self.min_battery_voltage = 0
+        self.online = False
 
-        data = self.read_serial_data_template()
+        data = self.read_pylon_stack()
         # check if connection success
         if data is False:
             return False
 
-        # Uncomment if BMS does not supply capacity
-        self.capacity = data.pylonData['Calculated']['TotalCapacity_Ah']
-        self.cell_count = data.battcount * 15
-        self.cell_max_voltage = MAX_CELL_VOLTAGE
-        self.cell_min_voltage = MIN_CELL_VOLTAGE
-        self.max_battery_voltage = MAX_CELL_VOLTAGE * self.cell_count
-        self.min_battery_voltage = MIN_CELL_VOLTAGE * self.cell_count
+        try:
+            self.capacity = data.pylonData['Calculated']['TotalCapacity_Ah']
+            self.cell_count = data.battcount * 15
+            self.cell_max_voltage = MAX_CELL_VOLTAGE
+            self.cell_min_voltage = MIN_CELL_VOLTAGE
+            self.max_battery_voltage = MAX_CELL_VOLTAGE * self.cell_count
+            self.min_battery_voltage = MIN_CELL_VOLTAGE * self.cell_count
+            self.online = True
+        except:
+            pass
+
         return True
 
-
     def refresh_data(self):
-        # call all functions that will refresh the battery data.
-        # This will be called for every iteration (1 second)
-        # Return True if success, False for failure
-        result = self.read_soc_data()
-
+        result = self.read_bat_data()
         return result
 
     def read_status_data(self):
-        # todo
-        return True
+        result = self.read_bat_data()
+        return result
 
-    def read_soc_data(self):
-        data = self.read_serial_data_template()
+    def read_bat_data(self):
+        self.voltage = 0
+        self.current = 0
+        self.soc = 0
+        self.max_battery_current = 0
+        self.max_battery_discharge_current = 0
+        self.online = False
+
+        data = self.read_pylon_stack()
         # check if connection success
         if data is False:
             return False
 
-        self.voltage = data.pylonData['Calculated']['MeanVoltage_V']
-        self.current = data.pylonData['Calculated']['TotalCurrent_A']
-        self.soc = data.pylonData['Calculated']['Remain_Percent']
-        self.max_battery_current = data.pylonData['Calculated']['MaxChargeCurrent_A']
-        self.max_battery_discharge_current = data.pylonData['Calculated']['MaxDischargeCurrent_A']
+        try:
+            self.voltage = data.pylonData['Calculated']['MeanVoltage_V']
+            self.current = data.pylonData['Calculated']['TotalCurrent_A']
+            self.soc = data.pylonData['Calculated']['Remain_Percent']
+            self.max_battery_current = data.pylonData['Calculated']['MaxChargeCurrent_A']
+            self.max_battery_discharge_current = data.pylonData['Calculated']['MaxDischargeCurrent_A']
+            self.online = True
+        except:
+            pass
+
         return True
 
-    def read_serial_data_template(self):
+    def read_pylon_stack(self):
         try:
-            x = PylontechStack(self.port, baud=115200, manualBattcountLimit=2)
-            x.update()
-            return x
-        except:
-            logger.error(">>> ERROR: PylontechStack update")
-
+            if(self.stack == None):
+                self.stack = PylontechStack(self.port, baud=115200, manualBattcountLimit=8)
+            if(self.stack.pylon.rs485.ser.isOpen):
+                self.stack.pylon.rs485.ser.close()
+            self.stack.pylon.rs485 = Rs485Handler(self.port, baud=115200)
+            if(self.stack.pylon.rs485.ser.isOpen):
+                self.stack.update()
+            else:
+                return False
+            if(self.stack.pylon.rs485.ser.isOpen):
+                self.stack.pylon.rs485.ser.close()
+            return self.stack
+        except Exception as err:
+            logger.error(">>> ERROR: PylontechStack update: " + str(err))
+        
         return False
