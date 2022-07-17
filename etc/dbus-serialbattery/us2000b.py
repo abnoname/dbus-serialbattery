@@ -182,21 +182,23 @@ class us2000b(Battery):
         try:
             if(self.stack == None):
                 self.stack = PylontechStack(self.port, baud=115200, manualBattcountLimit=8)
+                if(self.stack.battcount == 0):
+                    raise Exception("no batterystack found")
             if(self.stack.pylon.rs485.ser.isOpen):
                 self.stack.pylon.rs485.ser.close()
             self.stack.pylon.rs485 = Rs485Handler(self.port, baud=115200)
             if(self.stack.pylon.rs485.ser.isOpen):
                 self.stack.update()
             else:
-                return False
+                raise Exception("port not open")
             if(self.stack.pylon.rs485.ser.isOpen):
                 self.stack.pylon.rs485.ser.close()
             return self.stack
         except serial.SerialException as err:
             logger.error(">>> ERROR: PylontechStack SerialException: " + str(err))
-            raise exception("Connection Error")
+            raise Exception("Connection Error")
         except Exception as err:
             logger.error(">>> ERROR: PylontechStack update Exception: " + str(err))
-            raise exception("Update Error")
+            raise Exception("Update Error: " + str(err))
         
         return False
